@@ -1,0 +1,2 @@
+this does naughty non-async writing in an async function, quickshare is
+not designed to scale well

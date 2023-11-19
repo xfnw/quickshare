@@ -1,0 +1,11 @@
+[package]
+name = "quickshare"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+axum = "0.6.20"
+structopt = { version = "0.3.26", default-features = false }
+tokio = "1.34.0"

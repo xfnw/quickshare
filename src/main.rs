@@ -20,12 +20,19 @@ async fn root() -> Html<&'static str> {
     Html(include_str!("form.html"))
 }
 
+macro_rules! unwrap_or_bad {
+    ($ex:expr) => {
+        match $ex {
+            Ok(v) => v,
+            Err(e) => {
+                return Err((StatusCode::BAD_REQUEST, e.to_string()));
+            }
+        }
+    };
+}
+
 async fn upload(mut multipart: Multipart) -> Result<&'static str, (StatusCode, String)> {
-    while let Some(mut field) = multipart
-        .next_field()
-        .await
-        .map_err(|e| (StatusCode::BAD_REQUEST, e.to_string()))?
-    {
+    while let Some(mut field) = unwrap_or_bad!(multipart.next_field().await) {
         if Some("file") != field.name() {
             continue;
         }
@@ -34,20 +41,19 @@ async fn upload(mut multipart: Multipart) -> Result<&'static str, (StatusCode, S
             "quickshare_{}",
             field
                 .file_name()
-                .unwrap_or_else(|| "no-name")
+                .unwrap_or("untitled")
                 .replace('/', "")
         );
 
-        eprintln!("received {}", name);
-        let mut file = File::create(name).map_err(|e| (StatusCode::BAD_REQUEST, e.to_string()))?;
-        while let Some(chunk) = field
-            .chunk()
-            .await
-            .map_err(|e| (StatusCode::BAD_REQUEST, e.to_string()))?
-        {
-            println!("i got a chunk!");
-            file.write_all(&chunk);
+        // TODO: consider changing this to File::create_new once stabilized
+        // https://github.com/rust-lang/rust/issues/105135
+        let mut file = unwrap_or_bad!(File::options().write(true).create_new(true).open(&name));
+        while let Some(chunk) = unwrap_or_bad!(field.chunk().await) {
+            unwrap_or_bad!(file.write_all(&chunk));
         }
+
+        eprintln!("received {}", name);
+        return Ok("uploaded~");
     }
 
     Ok("you did not send a file? less work for me i guess")

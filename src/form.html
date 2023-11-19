@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<head>
+	<meta name="viewport" content="width=device-width, initial-scale=1">
+	<meta name="description" content="quickly spin up a file upload form">
+	<title>quickshare</title>
+	<style>
+		html { color-scheme: dark light }
+		*    { margin: 0; padding: .5em }
+		pre  { margin-top: 6em; text-align: center }
+	</style>
+</head>
+<body>
+<figure>
+	<pre role="img" aria-label="logo">
+┏━┃ ┃ ┃┛┏━┛┃ ┃┏━┛┃ ┃┏━┃┏━┃┏━┛
+┃ ┃ ┃ ┃┃┃  ┏┛ ━━┃┏━┃┏━┃┏┏┛┏━┛
+━━━┛━━┛┛━━┛┛ ┛━━┛┛ ┛┛ ┛┛ ┛━━┛</pre>
+	<figcaption hidden>
+		the text "QUICKSHARE" embossed with
+		unicode block characters
+	</figcaption>
+</figure>
+<pre>
+<form action="/up" method="post" enctype="multipart/form-data">
+<input type="file" name="file" role="button" aria-label="file upload"/>
+<input type="submit" value="upload"/>
+</form>
+</pre>
+</body>

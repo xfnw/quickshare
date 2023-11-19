@@ -1,4 +1,4 @@
-use std::net::SocketAddr;
+use std::{include_str, net::SocketAddr};
 use structopt::StructOpt;
 
 use axum::{
@@ -16,7 +16,7 @@ struct Opt {
 }
 
 async fn root() -> Html<&'static str> {
-    Html("hi")
+    Html(include_str!("form.html"))
 }
 
 async fn upload(mut multipart: Multipart) {}

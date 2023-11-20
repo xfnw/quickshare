@@ -64,7 +64,7 @@ async fn main() {
     let opt = Opt::from_args();
     let app = Router::new()
         .route("/", get(root))
-        .route("/up", post(upload))
+        .route("/", post(upload))
         .layer(DefaultBodyLimit::max(opt.limit * 1048576));
 
     eprintln!("listening on {}", opt.bindhost);

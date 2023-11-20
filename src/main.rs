@@ -2,7 +2,7 @@ use std::{fs::File, include_str, io::prelude::*, net::SocketAddr};
 use structopt::StructOpt;
 
 use axum::{
-    extract::Multipart,
+    extract::{DefaultBodyLimit, Multipart},
     http::StatusCode,
     response::Html,
     routing::{get, post},
@@ -14,6 +14,8 @@ use axum::{
 struct Opt {
     #[structopt(short, env = "BIND", default_value = "[::]:3000")]
     bindhost: SocketAddr,
+    #[structopt(short, help = "max upload size in MiB", default_value = "1024")]
+    limit: usize,
 }
 
 async fn root() -> Html<&'static str> {
@@ -25,6 +27,7 @@ macro_rules! unwrap_or_bad {
         match $ex {
             Ok(v) => v,
             Err(e) => {
+                eprintln!("error {:?}", e);
                 return Err((StatusCode::BAD_REQUEST, e.to_string()));
             }
         }
@@ -39,10 +42,7 @@ async fn upload(mut multipart: Multipart) -> Result<&'static str, (StatusCode, S
 
         let name = format!(
             "quickshare_{}",
-            field
-                .file_name()
-                .unwrap_or("untitled")
-                .replace('/', "")
+            field.file_name().unwrap_or("untitled").replace('/', "")
         );
 
         // TODO: consider changing this to File::create_new once stabilized
@@ -64,7 +64,8 @@ async fn main() {
     let opt = Opt::from_args();
     let app = Router::new()
         .route("/", get(root))
-        .route("/up", post(upload));
+        .route("/up", post(upload))
+        .layer(DefaultBodyLimit::max(opt.limit * 1048576));
 
     eprintln!("listening on {}", opt.bindhost);
     axum::Server::bind(&opt.bindhost)

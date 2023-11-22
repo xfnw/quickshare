@@ -1,0 +1,6 @@
+annoyingly, clap includes an empty 'Usage:' section when the usage
+feature is disabled, rather than just omitting it. not wanting an empty
+section is the only reason i have enabled it, as the generated output
+of "name [OPTIONS]" is completely pointless. why it does not just list
+the actual options there, so that it would actually convey useful
+information, is beyond me.

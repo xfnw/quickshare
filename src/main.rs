@@ -1,5 +1,5 @@
+use clap::Parser;
 use std::{fs::File, include_str, io::prelude::*, net::SocketAddr};
-use structopt::StructOpt;
 
 use axum::{
     extract::{DefaultBodyLimit, Multipart},
@@ -9,12 +9,12 @@ use axum::{
     Router,
 };
 
-#[derive(Debug, StructOpt)]
-#[structopt(name = "quickshare", about = "quickly spin up a file upload form")]
+#[derive(Debug, Parser)]
+#[command(about = "quickly spin up a file upload form")]
 struct Opt {
-    #[structopt(short, env = "BIND", default_value = "[::]:3000")]
+    #[arg(short, env = "BIND", default_value = "[::]:3000")]
     bindhost: SocketAddr,
-    #[structopt(short, help = "max upload size in MiB", default_value = "1024")]
+    #[arg(short, help = "max upload size in MiB", default_value = "1024")]
     limit: usize,
 }
 
@@ -61,7 +61,7 @@ async fn upload(mut multipart: Multipart) -> Result<&'static str, (StatusCode, S
 
 #[tokio::main]
 async fn main() {
-    let opt = Opt::from_args();
+    let opt = Opt::parse();
     let app = Router::new()
         .route("/", get(root))
         .route("/", post(upload))

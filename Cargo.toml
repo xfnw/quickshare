@@ -9,3 +9,10 @@ edition = "2021"
 axum = { version = "0.6.20", features = ["multipart", "tokio", "http1"], default-features = false }
 clap = { version = "4.4.8", features = ["derive", "std", "env", "help", "usage"], default-features = false }
 tokio = { version = "1.34.0", features = ["tokio-macros", "macros", "rt-multi-thread"] }
+
+[profile.smol]
+inherits = "release"
+opt-level = "z"
+panic = "abort"
+strip = true
+lto = true

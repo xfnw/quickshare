@@ -45,9 +45,7 @@ async fn upload(mut multipart: Multipart) -> Result<&'static str, (StatusCode, S
             field.file_name().unwrap_or("untitled").replace('/', "")
         );
 
-        // TODO: consider changing this to File::create_new once stabilized
-        // https://github.com/rust-lang/rust/issues/105135
-        let mut file = unwrap_or_bad!(File::options().write(true).create_new(true).open(&name));
+        let mut file = unwrap_or_bad!(File::create_new(&name));
         while let Some(chunk) = unwrap_or_bad!(field.chunk().await) {
             unwrap_or_bad!(file.write_all(&chunk));
         }

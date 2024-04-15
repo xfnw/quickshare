@@ -1,5 +1,6 @@
 use clap::Parser;
 use std::{fs::File, include_str, io::prelude::*, net::SocketAddr};
+use tokio::net::TcpListener;
 
 use axum::{
     extract::{DefaultBodyLimit, Multipart},
@@ -65,9 +66,7 @@ async fn main() {
         .route("/", post(upload))
         .layer(DefaultBodyLimit::max(opt.limit * 1048576));
 
-    eprintln!("listening on {}", opt.bindhost);
-    axum::Server::bind(&opt.bindhost)
-        .serve(app.into_make_service())
-        .await
-        .unwrap();
+    let listen = TcpListener::bind(&opt.bindhost).await.unwrap();
+    eprintln!("listening on {}", listen.local_addr().unwrap());
+    axum::serve(listen, app.into_make_service()).await.unwrap();
 }

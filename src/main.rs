@@ -1,6 +1,7 @@
 use clap::Parser;
 use std::{fs::File, include_str, io::prelude::*, net::SocketAddr};
 use tokio::net::TcpListener;
+use tower_http::services::ServeDir;
 
 use axum::{
     extract::{DefaultBodyLimit, Multipart},
@@ -17,6 +18,8 @@ struct Opt {
     bindhost: SocketAddr,
     #[arg(short, help = "max upload size in MiB", default_value = "1024")]
     limit: usize,
+    #[arg(short, long, help = "allow access to contents of the current directory")]
+    serve: bool,
 }
 
 async fn root() -> Html<&'static str> {
@@ -65,6 +68,12 @@ async fn main() {
         .route("/", get(root))
         .route("/", post(upload))
         .layer(DefaultBodyLimit::max(opt.limit * 1048576));
+
+    let app = if opt.serve {
+        app.fallback_service(ServeDir::new("."))
+    } else {
+        app
+    };
 
     let listen = TcpListener::bind(&opt.bindhost).await.unwrap();
     eprintln!("listening on {}", listen.local_addr().unwrap());

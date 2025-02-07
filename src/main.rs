@@ -38,7 +38,7 @@ macro_rules! unwrap_or_bad {
     };
 }
 
-async fn upload(mut multipart: Multipart) -> Result<&'static str, (StatusCode, String)> {
+async fn upload(mut multipart: Multipart) -> Result<String, (StatusCode, String)> {
     while let Some(mut field) = unwrap_or_bad!(multipart.next_field().await) {
         if Some("file") != field.name() {
             continue;
@@ -55,10 +55,10 @@ async fn upload(mut multipart: Multipart) -> Result<&'static str, (StatusCode, S
         }
 
         eprintln!("received {}", name);
-        return Ok("uploaded~");
+        return Ok(name);
     }
 
-    Ok("you did not send a file? less work for me i guess")
+    Err((StatusCode::BAD_REQUEST, "no file? 😳".to_string()))
 }
 
 #[tokio::main]

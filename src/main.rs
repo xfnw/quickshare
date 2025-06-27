@@ -1,4 +1,4 @@
-use clap::Parser;
+use argh::FromArgs;
 use std::{fs::File, include_str, io::prelude::*, net::SocketAddr};
 use tokio::net::TcpListener;
 use tower_http::services::ServeDir;
@@ -11,18 +11,18 @@ use axum::{
     Router,
 };
 
-#[derive(Debug, Parser)]
-#[command(about = "quickly spin up a file upload form")]
+/// quickly spin up a file upload form
+#[derive(Debug, FromArgs)]
+#[argh(help_triggers("-h", "--help"))]
 struct Opt {
-    #[arg(short, env = "BIND", default_value = "[::]:3000")]
-    bindhost: SocketAddr,
-    #[arg(short, help = "max upload size in MiB", default_value = "1024")]
+    /// socket address to bind
+    #[argh(option, short = 'b', default = "\"[::]:3000\".parse().unwrap()")]
+    bind: SocketAddr,
+    /// max upload size in MiB (default: 1024)
+    #[argh(option, short = 'l', default = "1024")]
     limit: usize,
-    #[arg(
-        short,
-        long,
-        help = "allow access to contents of the current directory"
-    )]
+    /// allow access to contents of current directory
+    #[argh(switch, short = 's')]
     serve: bool,
 }
 
@@ -79,7 +79,7 @@ async fn upload(
 
 #[tokio::main]
 async fn main() {
-    let opt = Opt::parse();
+    let opt: Opt = argh::from_env();
     let app = Router::new()
         .route("/", get(root))
         .route("/", post(upload))
@@ -91,7 +91,7 @@ async fn main() {
         app
     };
 
-    let listen = TcpListener::bind(&opt.bindhost).await.unwrap();
+    let listen = TcpListener::bind(&opt.bind).await.unwrap();
     eprintln!("listening on {}", listen.local_addr().unwrap());
     axum::serve(listen, app.into_make_service()).await.unwrap();
 }

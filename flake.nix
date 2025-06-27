@@ -1,8 +1,11 @@
 {
   inputs = {
     flake-utils.url = "github:numtide/flake-utils";
-    naersk.url = "github:nix-community/naersk";
     nixpkgs.url = "github:NixOS/nixpkgs/nixpkgs-unstable";
+    naersk = {
+      url = "github:nix-community/naersk";
+      inputs.nixpkgs.follows = "nixpkgs";
+    };
   };
 
   outputs = { self, flake-utils, naersk, nixpkgs }:
@@ -10,12 +13,13 @@
       let
         pkgs = (import nixpkgs) { inherit system; };
         naersk' = pkgs.callPackage naersk { };
-      in rec {
-        packages.quickshare = naersk'.buildPackage { src = ./.; };
+      in {
+        packages = rec {
+          quickshare = naersk'.buildPackage { src = ./.; };
+          default = quickshare;
+        };
 
-        defaultPackage = packages.quickshare;
-
-        devShell = pkgs.mkShell {
+        devShells.default = pkgs.mkShell {
           nativeBuildInputs = with pkgs; [ rustc cargo clippy ];
         };
       });

@@ -61,7 +61,7 @@ async fn upload(
             unwrap_or_bad!(file.write_all(&chunk));
         }
 
-        eprintln!("received {}", name);
+        eprintln!("received {name}");
 
         let proto = headers
             .get("x-forwarded-proto")

@@ -5,7 +5,7 @@ use tower_http::services::ServeDir;
 
 use axum::{
     extract::{DefaultBodyLimit, Multipart},
-    http::StatusCode,
+    http::{header::HeaderMap, StatusCode},
     response::Html,
     routing::{get, post},
     Router,
@@ -18,7 +18,11 @@ struct Opt {
     bindhost: SocketAddr,
     #[arg(short, help = "max upload size in MiB", default_value = "1024")]
     limit: usize,
-    #[arg(short, long, help = "allow access to contents of the current directory")]
+    #[arg(
+        short,
+        long,
+        help = "allow access to contents of the current directory"
+    )]
     serve: bool,
 }
 
@@ -38,7 +42,10 @@ macro_rules! unwrap_or_bad {
     };
 }
 
-async fn upload(mut multipart: Multipart) -> Result<String, (StatusCode, String)> {
+async fn upload(
+    headers: HeaderMap,
+    mut multipart: Multipart,
+) -> Result<String, (StatusCode, String)> {
     while let Some(mut field) = unwrap_or_bad!(multipart.next_field().await) {
         if Some("file") != field.name() {
             continue;
@@ -55,7 +62,16 @@ async fn upload(mut multipart: Multipart) -> Result<String, (StatusCode, String)
         }
 
         eprintln!("received {}", name);
-        return Ok(name);
+
+        let proto = headers
+            .get("x-forwarded-proto")
+            .and_then(|h| h.to_str().ok())
+            .unwrap_or("http");
+        let host = headers
+            .get("host")
+            .and_then(|h| h.to_str().ok())
+            .unwrap_or("localhost");
+        return Ok(format!("{proto}://{host}/{name}\n"));
     }
 
     Err((StatusCode::BAD_REQUEST, "no file? 😳".to_string()))

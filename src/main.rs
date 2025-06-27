@@ -1,12 +1,12 @@
 #![deny(clippy::pedantic)]
 
 use argh::FromArgs;
-use std::{fs::File, include_str, io::prelude::*, net::SocketAddr};
+use std::{fs::File, include_str, io::prelude::*, net::SocketAddr, sync::Arc};
 use tokio::net::TcpListener;
 use tower_http::services::ServeDir;
 
 use axum::{
-    extract::{DefaultBodyLimit, Multipart},
+    extract::{DefaultBodyLimit, Multipart, State},
     http::{header::HeaderMap, StatusCode},
     response::Html,
     routing::{get, post},
@@ -26,6 +26,13 @@ struct Opt {
     /// allow access to contents of current directory
     #[argh(switch, short = 's')]
     serve: bool,
+    /// omit the quickshare_ prefix added to filenames
+    #[argh(switch, short = 'u')]
+    unprefixed: bool,
+}
+
+struct AppState {
+    unprefixed: bool,
 }
 
 async fn root() -> Html<&'static str> {
@@ -45,6 +52,7 @@ macro_rules! unwrap_or_bad {
 }
 
 async fn upload(
+    State(state): State<Arc<AppState>>,
     headers: HeaderMap,
     mut multipart: Multipart,
 ) -> Result<String, (StatusCode, String)> {
@@ -53,10 +61,12 @@ async fn upload(
             continue;
         }
 
-        let name = format!(
-            "quickshare_{}",
-            field.file_name().unwrap_or("untitled").replace('/', "")
-        );
+        let name = field.file_name().unwrap_or("untitled").replace('/', "");
+        let name = if state.unprefixed {
+            name
+        } else {
+            format!("quickshare_{name}")
+        };
 
         let mut file = unwrap_or_bad!(File::create_new(&name));
         while let Some(chunk) = unwrap_or_bad!(field.chunk().await) {
@@ -82,10 +92,14 @@ async fn upload(
 #[tokio::main]
 async fn main() {
     let opt: Opt = argh::from_env();
+    let state = Arc::new(AppState {
+        unprefixed: opt.unprefixed,
+    });
     let app = Router::new()
         .route("/", get(root))
         .route("/", post(upload))
-        .layer(DefaultBodyLimit::max(opt.limit * 1_048_576));
+        .layer(DefaultBodyLimit::max(opt.limit * 1_048_576))
+        .with_state(state);
 
     let app = if opt.serve {
         app.fallback_service(ServeDir::new("."))

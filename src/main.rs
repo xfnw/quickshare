@@ -83,7 +83,7 @@ async fn main() {
     let app = Router::new()
         .route("/", get(root))
         .route("/", post(upload))
-        .layer(DefaultBodyLimit::max(opt.limit * 1048576));
+        .layer(DefaultBodyLimit::max(opt.limit * 1_048_576));
 
     let app = if opt.serve {
         app.fallback_service(ServeDir::new("."))

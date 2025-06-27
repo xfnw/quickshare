@@ -1,3 +1,5 @@
+#![deny(clippy::pedantic)]
+
 use argh::FromArgs;
 use std::{fs::File, include_str, io::prelude::*, net::SocketAddr};
 use tokio::net::TcpListener;

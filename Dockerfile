@@ -1,10 +1,10 @@
 FROM alpine:latest AS build
 RUN apk add --no-cache rust cargo
 WORKDIR /build
-RUN mkdir src && echo 'fn main() {}' > src/main.rs
+RUN mkdir src && echo 'fn main() {panic!()}' > src/main.rs
 ADD Cargo.* ./
 RUN cargo build -r
-ADD src/* src/
+ADD src src
 RUN touch src/main.rs
 RUN cargo build -r
 FROM alpine:latest

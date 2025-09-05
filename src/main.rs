@@ -29,6 +29,9 @@ struct Opt {
     /// omit the quickshare_ prefix added to filenames
     #[argh(switch, short = 'u')]
     unprefixed: bool,
+    /// turn off uploading files
+    #[argh(switch)]
+    no_upload: bool,
 }
 
 struct AppState {
@@ -95,9 +98,15 @@ async fn main() {
     let state = Arc::new(AppState {
         unprefixed: opt.unprefixed,
     });
-    let app = Router::new()
-        .route("/", get(root))
-        .route("/", post(upload))
+    let app = Router::new();
+
+    let app = if opt.no_upload {
+        app
+    } else {
+        app.route("/", get(root)).route("/", post(upload))
+    };
+
+    let app = app
         .layer(DefaultBodyLimit::max(opt.limit * 1_048_576))
         .with_state(state);
 

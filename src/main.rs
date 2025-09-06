@@ -188,8 +188,8 @@ async fn main() {
     let app = if opt.no_pipe {
         app
     } else {
-        app.route("/pipe/{name}", get(recv_pipe))
-            .route("/pipe/{name}", post(send_pipe))
+        app.route("/pipe/{*name}", get(recv_pipe))
+            .route("/pipe/{*name}", post(send_pipe))
     };
 
     let app = app.with_state(state);

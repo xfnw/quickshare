@@ -180,7 +180,9 @@ async fn main() {
     let app = if opt.no_upload {
         app
     } else {
-        app.route("/", get(root)).route("/", post(upload))
+        app.route("/", get(root))
+            .route("/", post(upload))
+            .layer(DefaultBodyLimit::max(opt.limit * 1_048_576))
     };
 
     let app = if opt.no_pipe {
@@ -190,9 +192,7 @@ async fn main() {
             .route("/pipe/{name}", post(send_pipe))
     };
 
-    let app = app
-        .layer(DefaultBodyLimit::max(opt.limit * 1_048_576))
-        .with_state(state);
+    let app = app.with_state(state);
 
     let app = if opt.serve {
         app.fallback_service(ServeDir::new("."))

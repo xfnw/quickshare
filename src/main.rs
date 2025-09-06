@@ -77,7 +77,7 @@ macro_rules! unwrap_or_bad {
             Ok(v) => v,
             Err(e) => {
                 eprintln!("error {:?}", e);
-                return Err((StatusCode::BAD_REQUEST, e.to_string()));
+                return Err((StatusCode::BAD_REQUEST, format!("{e}\n")));
             }
         }
     };

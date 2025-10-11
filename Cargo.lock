@@ -413,6 +413,7 @@ version = "0.1.0"
 dependencies = [
  "argh",
  "axum",
+ "http-body",
  "tokio",
  "tower-http",
 ]

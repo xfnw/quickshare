@@ -1,26 +1,23 @@
 #![deny(clippy::pedantic)]
 
 use argh::FromArgs;
-use std::{
-    collections::BTreeMap, fs::File, include_str, io::prelude::*, net::SocketAddr, sync::Arc,
-};
-use tokio::{
-    net::TcpListener,
-    sync::{
-        mpsc::{channel, Receiver, Sender},
-        Mutex, MutexGuard,
-    },
-};
-use tower_http::services::ServeDir;
-
 use axum::{
-    body::Body,
+    body::{Body as AxumBody, HttpBody},
     extract::{DefaultBodyLimit, Multipart, Path, State},
-    http::{header::HeaderMap, StatusCode},
-    response::Html,
+    http::{header::HeaderMap, Response, StatusCode},
+    response::{Html, IntoResponse},
     routing::{get, post},
     Router,
 };
+use std::{
+    collections::BTreeMap, fs::File, include_str, io::prelude::*, net::SocketAddr, pin::Pin,
+    sync::Arc,
+};
+use tokio::{
+    net::TcpListener,
+    sync::{mpsc, oneshot, Mutex, MutexGuard},
+};
+use tower_http::services::ServeDir;
 
 /// quickly spin up a file upload form
 #[derive(Debug, FromArgs)]
@@ -53,17 +50,65 @@ struct AppState {
 }
 
 struct Pipe {
-    sender: Arc<Mutex<Sender<Body>>>,
-    receiver: Arc<Mutex<Receiver<Body>>>,
+    sender: Arc<Mutex<mpsc::Sender<PipeBody>>>,
+    receiver: Arc<Mutex<mpsc::Receiver<PipeBody>>>,
 }
 
 impl Pipe {
     fn new() -> Self {
-        let (sender, receiver) = channel(1);
+        let (sender, receiver) = mpsc::channel(1);
         Self {
             sender: Arc::new(Mutex::new(sender)),
             receiver: Arc::new(Mutex::new(receiver)),
         }
+    }
+}
+
+struct DropSender {
+    sender: Option<oneshot::Sender<()>>,
+}
+
+impl Drop for DropSender {
+    fn drop(&mut self) {
+        if let Some(sender) = self.sender.take() {
+            let _ = sender.send(());
+        }
+    }
+}
+
+/// a wrapper around [`AxumBody`] that sends to a oneshot channel
+/// when dropped
+struct PipeBody {
+    inner: AxumBody,
+    _on_drop: DropSender,
+}
+
+impl HttpBody for PipeBody {
+    type Data = axum::body::Bytes;
+    type Error = axum::Error;
+
+    #[inline]
+    fn poll_frame(
+        mut self: std::pin::Pin<&mut Self>,
+        cx: &mut std::task::Context<'_>,
+    ) -> std::task::Poll<Option<Result<http_body::Frame<Self::Data>, Self::Error>>> {
+        Pin::new(&mut self.inner).poll_frame(cx)
+    }
+
+    #[inline]
+    fn is_end_stream(&self) -> bool {
+        self.inner.is_end_stream()
+    }
+
+    #[inline]
+    fn size_hint(&self) -> http_body::SizeHint {
+        self.inner.size_hint()
+    }
+}
+
+impl IntoResponse for PipeBody {
+    fn into_response(self) -> axum::response::Response {
+        Response::new(AxumBody::new(self))
     }
 }
 
@@ -132,7 +177,7 @@ fn pipecleaner(pipes: &mut MutexGuard<BTreeMap<String, Pipe>>) {
 async fn recv_pipe(
     Path(name): Path<String>,
     State(state): State<Arc<AppState>>,
-) -> Result<Body, (StatusCode, &'static str)> {
+) -> Result<PipeBody, (StatusCode, &'static str)> {
     let receiver = {
         let mut pipes = state.pipes.lock().await;
         pipecleaner(&mut pipes);
@@ -149,21 +194,26 @@ async fn recv_pipe(
 async fn send_pipe(
     Path(name): Path<String>,
     State(state): State<Arc<AppState>>,
-    body: Body,
+    body: AxumBody,
 ) -> Result<(), (StatusCode, String)> {
-    let sender = {
+    let pipe_sender = {
         let mut pipes = state.pipes.lock().await;
         pipecleaner(&mut pipes);
         pipes.entry(name).or_insert_with(Pipe::new).sender.clone()
     };
-    let sender = sender.lock().await;
+    let pipe_sender = pipe_sender.lock().await;
 
-    unwrap_or_bad!(sender.send(body).await);
-    // cursed way to pretend mpsc waits for the receiver,
-    // instead of returning immediately when there is capacity,
-    // since tokio does not allow having 0 capacity :(
-    // this only works because sender is locked behind a Mutex
-    unwrap_or_bad!(sender.reserve().await);
+    let (drop_sender, finished) = oneshot::channel();
+    let body = PipeBody {
+        inner: body,
+        _on_drop: DropSender {
+            sender: Some(drop_sender),
+        },
+    };
+
+    unwrap_or_bad!(pipe_sender.send(body).await);
+
+    unwrap_or_bad!(finished.await);
 
     Ok(())
 }

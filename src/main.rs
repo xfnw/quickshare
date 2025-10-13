@@ -50,7 +50,7 @@ struct AppState {
 }
 
 struct Pipe {
-    sender: Arc<Mutex<mpsc::Sender<PipeBody>>>,
+    sender: Arc<mpsc::Sender<PipeBody>>,
     receiver: Arc<Mutex<mpsc::Receiver<PipeBody>>>,
 }
 
@@ -58,7 +58,7 @@ impl Pipe {
     fn new() -> Self {
         let (sender, receiver) = mpsc::channel(1);
         Self {
-            sender: Arc::new(Mutex::new(sender)),
+            sender: Arc::new(sender),
             receiver: Arc::new(Mutex::new(receiver)),
         }
     }
@@ -201,7 +201,6 @@ async fn send_pipe(
         pipecleaner(&mut pipes);
         pipes.entry(name).or_insert_with(Pipe::new).sender.clone()
     };
-    let pipe_sender = pipe_sender.lock().await;
 
     let (drop_sender, finished) = oneshot::channel();
     let body = PipeBody {

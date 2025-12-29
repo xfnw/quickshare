@@ -1,4 +1,5 @@
 #![deny(clippy::pedantic)]
+#![allow(clippy::unnecessary_debug_formatting)]
 
 use argh::FromArgs;
 use axum::{
@@ -10,7 +11,13 @@ use axum::{
     Router,
 };
 use std::{
-    collections::BTreeMap, fs::File, include_str, io::prelude::*, net::SocketAddr, pin::Pin,
+    collections::BTreeMap,
+    fs::{self, File},
+    include_str,
+    io::prelude::*,
+    net::SocketAddr,
+    path::{Component, Path as StdPath, PathBuf},
+    pin::Pin,
     sync::Arc,
 };
 use tokio::{
@@ -133,14 +140,17 @@ async fn upload(
             continue;
         }
 
-        let name = field.file_name().unwrap_or("untitled").replace('/', "");
+        let name = sanitize_path(field.file_name().unwrap_or("untitled"));
+        if let Some(parent) = name.parent() {
+            unwrap_or_bad!(fs::create_dir_all(parent));
+        }
 
         let mut file = unwrap_or_bad!(File::create_new(&name));
         while let Some(chunk) = unwrap_or_bad!(field.chunk().await) {
             unwrap_or_bad!(file.write_all(&chunk));
         }
 
-        eprintln!("received {name}");
+        eprintln!("received {name:?}");
 
         let proto = headers
             .get("x-forwarded-proto")
@@ -150,10 +160,28 @@ async fn upload(
             .get("host")
             .and_then(|h| h.to_str().ok())
             .unwrap_or("localhost");
-        return Ok(format!("{proto}://{host}/{name}\n"));
+        return Ok(format!("{proto}://{host}/{}\n", name.display()));
     }
 
     Err((StatusCode::BAD_REQUEST, "no file? 😳".to_string()))
+}
+
+fn sanitize_path(path: impl AsRef<StdPath>) -> PathBuf {
+    let mut out = PathBuf::new();
+
+    for component in path.as_ref().components() {
+        match component {
+            Component::Prefix(_) | Component::RootDir | Component::CurDir => (),
+            Component::ParentDir => {
+                out.pop();
+            }
+            Component::Normal(c) => {
+                out.push(c);
+            }
+        }
+    }
+
+    out
 }
 
 fn pipecleaner(pipes: &mut MutexGuard<BTreeMap<String, Pipe>>) {

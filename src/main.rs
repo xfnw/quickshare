@@ -35,8 +35,8 @@ struct Opt {
     /// socket address to bind
     #[argh(option, short = 'b', default = "\"[::]:3000\".parse().unwrap()")]
     bind: SocketAddr,
-    /// max upload size in MiB (default: 1024)
-    #[argh(option, short = 'l', default = "1024")]
+    /// max form upload size in MiB (default: 10)
+    #[argh(option, short = 'l', default = "10")]
     limit: usize,
     /// allow access to contents of current directory
     #[argh(switch, short = 's')]

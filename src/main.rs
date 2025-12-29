@@ -33,9 +33,6 @@ struct Opt {
     /// allow access to contents of current directory
     #[argh(switch, short = 's')]
     serve: bool,
-    /// omit the quickshare_ prefix added to filenames
-    #[argh(switch, short = 'u')]
-    unprefixed: bool,
     /// turn off uploading files
     #[argh(switch)]
     no_upload: bool,
@@ -45,7 +42,6 @@ struct Opt {
 }
 
 struct AppState {
-    unprefixed: bool,
     pipes: Mutex<BTreeMap<String, Pipe>>,
 }
 
@@ -129,7 +125,6 @@ macro_rules! unwrap_or_bad {
 }
 
 async fn upload(
-    State(state): State<Arc<AppState>>,
     headers: HeaderMap,
     mut multipart: Multipart,
 ) -> Result<String, (StatusCode, String)> {
@@ -139,11 +134,6 @@ async fn upload(
         }
 
         let name = field.file_name().unwrap_or("untitled").replace('/', "");
-        let name = if state.unprefixed {
-            name
-        } else {
-            format!("quickshare_{name}")
-        };
 
         let mut file = unwrap_or_bad!(File::create_new(&name));
         while let Some(chunk) = unwrap_or_bad!(field.chunk().await) {
@@ -221,7 +211,6 @@ async fn send_pipe(
 async fn main() {
     let opt: Opt = argh::from_env();
     let state = Arc::new(AppState {
-        unprefixed: opt.unprefixed,
         pipes: Mutex::new(BTreeMap::new()),
     });
     let app = Router::new();

@@ -41,9 +41,12 @@ struct Opt {
     /// allow access to contents of current directory
     #[argh(switch, short = 's')]
     serve: bool,
-    /// turn off uploading files
+    /// turn off upload form
     #[argh(switch)]
     no_upload: bool,
+    /// turn off uploading via put
+    #[argh(switch)]
+    no_put: bool,
     /// turn off piping
     #[argh(switch)]
     no_pipe: bool,
@@ -280,7 +283,12 @@ async fn main() {
         app.route("/", get(root))
             .route("/", post(upload))
             .layer(DefaultBodyLimit::max(opt.limit * 1_048_576))
-            .route("/{*name}", put(upload_put))
+    };
+
+    let app = if opt.no_put {
+        app
+    } else {
+        app.route("/{*name}", put(upload_put))
     };
 
     let app = if opt.no_pipe {

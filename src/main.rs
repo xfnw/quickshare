@@ -7,7 +7,7 @@ use axum::{
     extract::{DefaultBodyLimit, Multipart, Path, State},
     http::{header::HeaderMap, Response, StatusCode},
     response::{Html, IntoResponse},
-    routing::{get, post, put},
+    routing::{get, get_service, post, put},
     Router,
 };
 use std::{
@@ -301,7 +301,7 @@ async fn main() {
     let app = app.with_state(state);
 
     let app = if opt.serve {
-        app.fallback_service(ServeDir::new("."))
+        app.route("/{*name}", get_service(ServeDir::new(".")))
     } else {
         app
     };

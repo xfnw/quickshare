@@ -7,7 +7,7 @@ use axum::{
     extract::{DefaultBodyLimit, Multipart, Path, State},
     http::{header::HeaderMap, Response, StatusCode},
     response::{Html, IntoResponse},
-    routing::{get, post},
+    routing::{get, post, put},
     Router,
 };
 use std::{
@@ -24,6 +24,7 @@ use tokio::{
     net::TcpListener,
     sync::{mpsc, oneshot, Mutex, MutexGuard},
 };
+use tokio_stream::StreamExt;
 use tower_http::services::ServeDir;
 
 /// quickly spin up a file upload form
@@ -166,6 +167,36 @@ async fn upload(
     Err((StatusCode::BAD_REQUEST, "no file? 😳".to_string()))
 }
 
+async fn upload_put(
+    headers: HeaderMap,
+    Path(name): Path<PathBuf>,
+    body: AxumBody,
+) -> Result<String, (StatusCode, String)> {
+    let name = sanitize_path(&name);
+    if let Some(parent) = name.parent() {
+        unwrap_or_bad!(fs::create_dir_all(parent));
+    }
+
+    let mut file = unwrap_or_bad!(File::create_new(&name));
+    let mut stream = body.into_data_stream();
+    while let Some(chunk) = stream.next().await {
+        let chunk = unwrap_or_bad!(chunk);
+        unwrap_or_bad!(file.write_all(&chunk));
+    }
+
+    eprintln!("received {name:?}");
+
+    let proto = headers
+        .get("x-forwarded-proto")
+        .and_then(|h| h.to_str().ok())
+        .unwrap_or("http");
+    let host = headers
+        .get("host")
+        .and_then(|h| h.to_str().ok())
+        .unwrap_or("localhost");
+    Ok(format!("{proto}://{host}/{}\n", name.display()))
+}
+
 fn sanitize_path(path: impl AsRef<StdPath>) -> PathBuf {
     let mut out = PathBuf::new();
 
@@ -249,6 +280,7 @@ async fn main() {
         app.route("/", get(root))
             .route("/", post(upload))
             .layer(DefaultBodyLimit::max(opt.limit * 1_048_576))
+            .route("/{*name}", put(upload_put))
     };
 
     let app = if opt.no_pipe {
